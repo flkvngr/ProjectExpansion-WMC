@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WM Center | Potential Property</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  :root{
+    --navy-1:#162447;
+    --navy-2:#0f234e;
+    --navy-3:#0a1730;
+    --salmon:#FF5757;
+    --white:#ffffff;
+    --slate:#9aa5c4;
+    --card:#152244;
+    --line:#26355f;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{
+    min-height:100%;
+    background: radial-gradient(circle at 50% 20%, var(--navy-2) 0%, var(--navy-1) 60%, var(--navy-3) 100%);
+    font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color:var(--white);
+    overflow-x:hidden;
+  }
+  a{ color:inherit; }
+  #intro-overlay{
+    position:fixed; inset:0; background:#000; z-index:9999;
+    opacity:1; pointer-events:none; transition:opacity .6s ease;
+  }
+  #intro-overlay.hide{ opacity:0; }
+  .home-btn{
+    position:fixed; top:20px; right:20px; width:46px; height:46px; border-radius:50%;
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.35);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:500;
+    text-decoration:none; transition:.2s ease;
+  }
+  .home-btn svg{ width:20px; height:20px; fill:#fff; }
+  .home-btn:hover{ box-shadow:0 0 6px rgba(255,87,87,.6), 0 0 18px rgba(255,87,87,.45); transform:translateY(-2px); }
+
+  /* ================= PAGE 1 : FORM ================= */
+  #page1{
+    min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .form-shell{
+    width:100%; max-width:1180px;
+    background:rgba(255,255,255,0.03);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:20px 26px;
+    backdrop-filter:blur(6px);
+  }
+  .form-title{ font-size:20px; font-weight:700; margin-bottom:2px; }
+  .nav-link-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.05); border:1px solid var(--line); color:var(--white);
+    padding:8px 18px; border-radius:20px; font-size:12.5px; text-decoration:none;
+    transition:.2s ease; white-space:nowrap;
+  }
+  .nav-link-btn:hover{ border-color:var(--salmon); box-shadow:0 0 10px rgba(255,87,87,.35); }
+  .nav-link-btn.primary{ background:var(--salmon); border-color:var(--salmon); font-weight:700; }
+  .nav-link-btn.primary:hover{ box-shadow:0 0 14px rgba(255,87,87,.6); }
+  .form-title-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .form-sub{ font-size:11.5px; color:var(--slate); margin-top:2px; }
+  .form-grid{
+    display:flex;
+    flex-wrap:wrap;
+    margin:-7px;
+  }
+  .form-col{
+    flex:1 1 300px;
+    padding:7px;
+    box-sizing:border-box;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .field{ display:flex; flex-direction:column; gap:2px; }
+  .field label{ font-size:10.5px; color:var(--slate); line-height:1.3; }
+  .field label b{ color:var(--salmon); font-weight:700; }
+  .field input, .field select, .field textarea{
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);
+    border-radius:7px;
+    padding:6px 9px;
+    color:var(--white);
+    font-size:12.5px;
+    font-family:inherit;
+    outline:none;
+    transition:border-color .15s ease;
+  }
+  .field textarea{ resize:none; }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--salmon); }
+  .field input::placeholder, .field textarea::placeholder{ color:#5b6690; }
+
+  .photo-box{
+    border:1.5px dashed var(--line);
+    border-radius:10px;
+    height:88px;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:4px;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+    background:rgba(255,255,255,0.03);
+  }
+  .photo-box:hover{ border-color:var(--salmon); }
+  .photo-box img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .photo-box span{ font-size:10.5px; color:var(--slate); text-align:center; padding:0 10px; }
+  .photo-box input{ display:none; }
+
+  .submit-row{ display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:12px; }
+  .btn-submit{
+    background:var(--salmon); color:#fff; border:none; border-radius:22px;
+    padding:9px 26px; font-size:13px; font-weight:700; cursor:pointer;
+    transition:.2s ease;
+  }
+  .btn-submit:hover{ box-shadow:0 0 14px rgba(255,87,87,.6); transform:translateY(-2px); }
+  .btn-submit:disabled{ opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  /* modal */
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(5,10,25,0.75); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:2000;
+  }
+  .modal-bg.show{ display:flex; }
+  .modal-box{
+    background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:28px 30px; max-width:380px; text-align:center;
+  }
+  .modal-box .icon{ font-size:34px; margin-bottom:10px; }
+  .modal-box h3{ font-size:17px; margin-bottom:8px; }
+  .modal-box p{ font-size:13px; color:var(--slate); margin-bottom:18px; line-height:1.5; }
+  .modal-box button{
+    background:var(--salmon); color:#fff; border:none; border-radius:20px;
+    padding:9px 24px; font-size:13px; cursor:pointer; font-weight:700;
+  }
+
+  @media (max-width:900px){
+    #page1{ align-items:flex-start; padding:70px 14px 30px; }
+    .form-col{ flex:1 1 100%; }
+  }
+
+  /* ================= PAGE 2 : MAP & ANALYSIS ================= */
+  #page2{ display:none; min-height:100vh; padding:70px 26px 60px; max-width:1400px; margin:0 auto; }
+  .p2-header{ margin-bottom:18px; }
+  .p2-header h1{ font-size:24px; font-weight:700; }
+  .p2-header p{ font-size:13px; color:var(--slate); margin-top:2px; }
+
+  .city-row{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
+  .city-btn{
+    background:rgba(255,255,255,0.05); border:1px solid var(--line); color:var(--white);
+    padding:8px 18px; border-radius:20px; font-size:13px; cursor:pointer;
+    transition:.15s ease;
+  }
+  .city-btn:hover{ border-color:var(--salmon); }
+  .city-btn.active{ background:var(--salmon); border-color:var(--salmon); font-weight:700; }
+
+  #map{ height:440px; border-radius:16px; border:1px solid var(--line); margin-bottom:18px; }
+
+  .stat-strip{ display:flex; gap:30px; flex-wrap:wrap; margin-bottom:20px; }
+  .stat{ border-left:2px solid var(--salmon); padding-left:12px; }
+  .stat .num{ font-size:22px; font-weight:700; }
+  .stat .lbl{ font-size:11.5px; color:var(--slate); }
+
+  .toolbar{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+  .sort-group{ display:flex; gap:8px; flex-wrap:wrap; }
+  .sort-btn{
+    border:1px solid var(--line); background:rgba(255,255,255,0.04); color:var(--white);
+    padding:7px 14px; border-radius:16px; font-size:12.5px; cursor:pointer;
+  }
+  .sort-btn.active{ background:var(--white); color:var(--navy-1); border-color:var(--white); }
+
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); gap:18px; }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden;
+    display:flex; flex-direction:column; position:relative;
+  }
+  .card-img{ width:100%; aspect-ratio:4/3; background:#1c2b52 center/cover no-repeat; }
+  .card-img.noimg{ display:flex; align-items:center; justify-content:center; color:var(--slate); font-size:12px; }
+  .score-pill{
+    position:absolute; top:10px; right:10px; background:var(--salmon); color:#fff;
+    font-weight:700; font-size:13px; padding:3px 11px; border-radius:12px;
+  }
+  .card-body{ padding:16px; display:flex; flex-direction:column; gap:8px; }
+  .addr{ font-size:15px; font-weight:700; }
+  .addr a{ text-decoration:none; border-bottom:1px solid var(--salmon); }
+  .summary{ font-size:12.5px; color:var(--slate); }
+  .price-row{ display:flex; justify-content:space-between; border-top:1px solid var(--line); padding-top:8px; }
+  .price{ font-weight:700; color:var(--salmon); }
+  .price small{ color:var(--slate); font-weight:400; font-size:11px; }
+  .card-links{ display:flex; gap:8px; flex-wrap:wrap; padding-top:6px; }
+  .card-links a{
+    font-size:11.5px; text-decoration:none; border:1px solid var(--line);
+    padding:6px 10px; border-radius:14px; flex:1; text-align:center;
+  }
+  .card-links a.primary{ background:var(--salmon); border-color:var(--salmon); }
+
+  .empty-state{ color:var(--slate); font-size:13.5px; padding:40px 4px; text-align:center; }
+
+  /* Mini submission box (upload data GIS baru) */
+  .gis-upload{
+    margin-top:30px; border:1px dashed var(--line); border-radius:14px;
+    padding:18px 20px; display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:14px; background:rgba(255,255,255,0.02);
+  }
+  .gis-upload .txt h4{ font-size:14px; margin-bottom:3px; }
+  .gis-upload .txt p{ font-size:11.5px; color:var(--slate); }
+  .gis-upload input[type=file]{ display:none; }
+  .gis-upload label{
+    background:var(--salmon); color:#fff; padding:9px 20px; border-radius:20px;
+    font-size:12.5px; cursor:pointer; font-weight:700; white-space:nowrap;
+  }
+
+  @media (max-width:640px){
+    #page2{ padding:60px 14px 40px; }
+    #map{ height:300px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="intro-overlay"></div>
+<a class="home-btn" href="index.html" aria-label="Kembali ke Home">
+  <svg viewBox="0 0 24 24"><path d="M12 3.1 2 12h3v9h6v-6h2v6h6v-9h3L12 3.1zm0 2.69 6 5.4V19h-2v-6H8v6H6v-7.81l6-5.4z"/></svg>
+</a>
+
+<!-- ======================= PAGE 1 : FORM ======================= -->
+<section id="page1">
+  <div class="form-shell">
+    <div class="form-title-row">
+      <div>
+        <div class="form-title">Submit Potential Property</div>
+        <div class="form-sub">Isi data properti kandidat lokasi cabang baru. Field bertanda <b style="color:var(--salmon)">*</b> wajib diisi.</div>
+      </div>
+      <a class="nav-link-btn" href="#2">📍 Lihat List Property</a>
+    </div>
+
+    <div class="form-grid">
+      <!-- kolom kiri -->
+      <div class="form-col">
+        <div class="field">
+          <label>Link GDrive gambar-gambar <b>*</b></label>
+          <input type="url" id="f_linkGambar" placeholder="https://drive.google.com/...">
+        </div>
+        <div class="field">
+          <label>Alamat property (secara general) <b>*</b></label>
+          <input type="text" id="f_alamat" placeholder="Jl. Contoh No.1">
+        </div>
+        <div class="field">
+          <label>Link alamat (Google Maps) <b>*</b></label>
+          <input type="url" id="f_linkMaps" placeholder="https://maps.app.goo.gl/...">
+        </div>
+        <div class="field">
+          <label>Link agent property <b>*</b></label>
+          <input type="url" id="f_linkAgent" placeholder="https://...">
+        </div>
+        <div class="field">
+          <label>Skor penilaian (opsional)</label>
+          <input type="number" id="f_skor" placeholder="0-100">
+        </div>
+        <div class="field">
+          <label>Short summary <b>*</b></label>
+          <textarea id="f_summary" rows="2" placeholder="Ringkasan singkat kondisi/lokasi properti"></textarea>
+        </div>
+        <div class="field">
+          <label>Harga sewa per tahun (angka flat tanpa titik) <b>*</b></label>
+          <input type="number" id="f_hargaSewa" placeholder="200000000">
+        </div>
+      </div>
+
+      <!-- kolom tengah -->
+      <div class="form-col">
+        <div class="field">
+          <label>Luas tanah dalam m² (opsional)</label>
+          <input type="number" id="f_luasTanah" placeholder="150">
+        </div>
+        <div class="field">
+          <label>Lebar bangunan dalam meter (opsional)</label>
+          <input type="number" id="f_lebarBangunan" placeholder="8">
+        </div>
+        <div class="field">
+          <label>Panjang bangunan dalam meter (opsional)</label>
+          <input type="number" id="f_panjangBangunan" placeholder="16">
+        </div>
+        <div class="field">
+          <label>Total luas bangunan dalam m² (opsional)</label>
+          <input type="number" id="f_totalLuasBangunan" placeholder="300">
+        </div>
+        <div class="field">
+          <label>Jumlah lantai (opsional)</label>
+          <input type="text" id="f_jumlahLantai" placeholder="2 Lantai">
+        </div>
+        <div class="field">
+          <label>Kondisi bangunan (opsional)</label>
+          <input type="text" id="f_kondisiBangunan" placeholder="Baik / renovasi ringan">
+        </div>
+        <div class="field">
+          <label>Contact person agent <b>*</b></label>
+          <input type="text" id="f_contactAgent" placeholder="http://wa.me/62812xxxxxx">
+        </div>
+        <div class="field">
+          <label>Deposit (angka flat, opsional)</label>
+          <input type="number" id="f_deposit" placeholder="0">
+        </div>
+      </div>
+
+      <!-- kolom kanan -->
+      <div class="form-col">
+        <label class="photo-box" id="photoBox">
+          <input type="file" id="f_gambar" accept="image/*">
+          <span id="photoBoxText">📷<br>Upload/drag sebuah foto disini</span>
+        </label>
+        <div class="field">
+          <label>Pilih kota <b>*</b></label>
+          <select id="f_kota">
+            <option value="">Memuat daftar kota...</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tulis koordinat lokasi (lat, lng) <b>*</b></label>
+          <input type="text" id="f_koordinat" placeholder="-6.233723986142425, 106.83198575396864">
+        </div>
+      </div>
+    </div>
+
+    <div class="submit-row">
+      <span id="formMsg" style="font-size:12px; color:var(--slate);"></span>
+      <button class="btn-submit" id="btnSubmit">Submit Property</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PAGE 2 : PETA & ANALISIS ======================= -->
+<section id="page2">
+  <div class="p2-header">
+    <div class="form-title-row" style="margin-bottom:0;">
+      <div>
+        <h1>Peta & List Potential Property</h1>
+        <p>Data terhubung realtime dengan spreadsheet. Pilih kota untuk melihat sebaran dan skor lokasi.</p>
+      </div>
+      <a class="nav-link-btn primary" href="#1">➕ Tambah List Property</a>
+    </div>
+  </div>
+
+  <div class="city-row" id="cityRow"></div>
+
+  <div id="map"></div>
+
+  <div class="stat-strip" id="statStrip"></div>
+
+  <div class="toolbar">
+    <div class="sort-group" id="sortGroup">
+      <button class="sort-btn active" data-sort="skor">Skor tertinggi</button>
+      <button class="sort-btn" data-sort="harga">Harga termurah</button>
+    </div>
+  </div>
+
+  <div class="grid" id="cardGrid"></div>
+
+  <div class="gis-upload">
+    <div class="txt">
+      <h4>Update data analisis GIS</h4>
+      <p>Upload file <code>newdata_[nama sheet].html</code> hasil convert analisis QGIS terbaru.</p>
+    </div>
+    <label for="gisFile">Upload File</label>
+    <input type="file" id="gisFile" accept=".html">
+  </div>
+</section>
+
+<!-- ======================= MODAL ======================= -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal-box">
+    <div class="icon" id="modalIcon">✅</div>
+    <h3 id="modalTitle">Berhasil</h3>
+    <p id="modalText"></p>
+    <button onclick="closeModal()">Tutup</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   KONFIGURASI — ganti dengan URL Web App hasil deploy Apps Script kamu
+   ===================================================================== */
+const APPS_SCRIPT_URL = 'PASTE_URL_WEB_APP_APPS_SCRIPT_DI_SINI';
+
+/* ===================== ROUTING SEDERHANA (#1 / #2) ===================== */
+function route(){
+  const hash = window.location.hash.replace('#','');
+  const page2 = hash === '2';
+  document.getElementById('page1').style.display = page2 ? 'none' : 'flex';
+  document.getElementById('page2').style.display = page2 ? 'block' : 'none';
+  if(page2) initPage2();
+}
+window.addEventListener('hashchange', route);
+
+window.addEventListener('load', function(){
+  const overlay = document.getElementById('intro-overlay');
+  requestAnimationFrame(function(){
+    setTimeout(function(){
+      overlay.classList.add('hide');
+      setTimeout(function(){ overlay.remove(); }, 650);
+    }, 120);
+  });
+  route();
+  loadCityDropdown();
+});
+
+/* ===================== MODAL HELPER ===================== */
+function showModal(success, title, text){
+  document.getElementById('modalIcon').textContent = success ? '✅' : '⚠️';
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalText').textContent = text;
+  document.getElementById('modalBg').classList.add('show');
+}
+function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
+
+/* ===================== HELPER: fetch API Apps Script ===================== */
+async function apiGet(params){
+  const url = APPS_SCRIPT_URL + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  return res.json();
+}
+async function apiPost(body){
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // hindari CORS preflight
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+/* =====================================================================
+   HALAMAN 1 — FORM
+   ===================================================================== */
+let citiesCache = [];
+
+async function loadCityDropdown(){
+  try{
+    const data = await apiGet({ action: 'listSheets' });
+    citiesCache = data.sheets || [];
+    renderCityDropdown();
+  }catch(err){
+    console.error('Gagal memuat daftar kota', err);
+  }
+}
+function renderCityDropdown(){
+  const sel = document.getElementById('f_kota');
+  sel.innerHTML = '';
+  citiesCache.forEach(function(c){
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+  const addOpt = document.createElement('option');
+  addOpt.value = '__new__'; addOpt.textContent = '+ Tambah kota baru';
+  sel.appendChild(addOpt);
+}
+document.getElementById('f_kota').addEventListener('change', function(e){
+  if(e.target.value === '__new__'){
+    const newCity = prompt('Nama kota baru:');
+    if(newCity && newCity.trim() !== ''){
+      citiesCache.push(newCity.trim());
+      renderCityDropdown();
+      document.getElementById('f_kota').value = newCity.trim();
+    } else {
+      e.target.value = citiesCache[0] || '';
+    }
+  }
+});
+
+/* --- upload & kompres foto ke base64 supaya muat di cell sheet --- */
+let photoBase64 = '';
+document.getElementById('f_gambar').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const maxW = 500;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      photoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+      document.getElementById('photoBox').style.backgroundImage = '';
+      document.getElementById('photoBoxText').style.display = 'none';
+      let imgTag = document.getElementById('photoPreview');
+      if(!imgTag){
+        imgTag = document.createElement('img');
+        imgTag.id = 'photoPreview';
+        document.getElementById('photoBox').appendChild(imgTag);
+      }
+      imgTag.src = photoBase64;
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+/* --- submit form --- */
+document.getElementById('btnSubmit').addEventListener('click', async function(){
+  const btn = this;
+  const msg = document.getElementById('formMsg');
+
+  const data = {
+    gambar: photoBase64,
+    linkGambar: val('f_linkGambar'),
+    alamat: val('f_alamat'),
+    linkMaps: val('f_linkMaps'),
+    linkAgent: val('f_linkAgent'),
+    summary: val('f_summary'),
+    skor: val('f_skor'),
+    hargaSewa: val('f_hargaSewa'),
+    deposit: val('f_deposit'),
+    luasTanah: val('f_luasTanah'),
+    lebarBangunan: val('f_lebarBangunan'),
+    panjangBangunan: val('f_panjangBangunan'),
+    totalLuasBangunan: val('f_totalLuasBangunan'),
+    jumlahLantai: val('f_jumlahLantai'),
+    kondisiBangunan: val('f_kondisiBangunan'),
+    contactAgent: val('f_contactAgent'),
+    koordinat: val('f_koordinat'),
+    kota: val('f_kota')
+  };
+
+  // validasi wajib di sisi client (selain gambar, kota)
+  const requiredMap = {
+    gambar: 'Foto property', linkGambar: 'Link GDrive gambar', alamat: 'Alamat property',
+    linkMaps: 'Link alamat (maps)', linkAgent: 'Link agent property', summary: 'Short summary',
+    hargaSewa: 'Harga sewa', contactAgent: 'Contact person agent', koordinat: 'Koordinat lokasi',
+    kota: 'Kota'
+  };
+  const missing = Object.keys(requiredMap).filter(function(k){ return !data[k] || String(data[k]).trim()===''; });
+  if(missing.length > 0){
+    showModal(false, 'Belum lengkap', 'Field berikut wajib diisi: ' + missing.map(function(k){return requiredMap[k];}).join(', '));
+    return;
+  }
+
+  btn.disabled = true; msg.textContent = 'Mengirim...';
+  try{
+    const result = await apiPost({ action: 'submitProperty', data: data });
+    if(result.success){
+      showModal(true, 'Berhasil disimpan', 'Data properti sudah masuk ke spreadsheet.');
+      document.querySelectorAll('#page1 input, #page1 textarea').forEach(function(el){ el.value=''; });
+      photoBase64 = '';
+      const preview = document.getElementById('photoPreview');
+      if(preview) preview.remove();
+      document.getElementById('photoBoxText').style.display = 'block';
+    } else {
+      showModal(false, 'Gagal disimpan', result.error || 'Terjadi kesalahan tidak diketahui.');
+    }
+  }catch(err){
+    showModal(false, 'Gagal terkirim', 'Tidak bisa menghubungi server: ' + err.message);
+  }
+  btn.disabled = false; msg.textContent = '';
+});
+function val(id){ return document.getElementById(id).value; }
+
+/* =====================================================================
+   HALAMAN 2 — PETA & ANALISIS
+   ===================================================================== */
+let map, markersLayer;
+let currentCity = null;
+let currentRows = [];
+let currentGis = null;
+let currentSort = 'skor';
+let page2Initialized = false;
+
+async function initPage2(){
+  if(!page2Initialized){
+    try{
+      map = L.map('map').setView([-6.9, 110.4], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      markersLayer = L.layerGroup().addTo(map);
+    }catch(err){
+      console.error('Gagal memuat peta (Leaflet tidak tersedia):', err);
+      const mapEl = document.getElementById('map');
+      if(mapEl) mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--slate);font-size:13px;text-align:center;padding:20px;">Peta gagal dimuat. Periksa koneksi internet Anda, lalu muat ulang halaman.</div>';
+    }
+    page2Initialized = true;
+
+    document.querySelectorAll('.sort-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        document.querySelectorAll('.sort-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        currentSort = btn.dataset.sort;
+        renderCards();
+      });
+    });
+
+    document.getElementById('gisFile').addEventListener('change', handleGisUpload);
+  }
+
+  try{
+    const data = await apiGet({ action: 'listSheets' });
+    const sheets = data.sheets || [];
+    renderCityButtons(sheets);
+    if(sheets.length > 0 && !currentCity) selectCity(sheets[0]);
+  }catch(err){
+    console.error('Gagal memuat daftar kota di halaman 2:', err);
+  }
+}
+
+function renderCityButtons(sheets){
+  const row = document.getElementById('cityRow');
+  row.innerHTML = '';
+  sheets.forEach(function(city){
+    const btn = document.createElement('button');
+    btn.className = 'city-btn' + (city === currentCity ? ' active' : '');
+    btn.textContent = city;
+    btn.addEventListener('click', function(){ selectCity(city); });
+    row.appendChild(btn);
+  });
+}
+
+async function selectCity(city){
+  currentCity = city;
+  document.querySelectorAll('.city-btn').forEach(function(b){
+    b.classList.toggle('active', b.textContent === city);
+  });
+
+  const [dataRes, gisRes] = await Promise.all([
+    apiGet({ action: 'getData', city: city }),
+    apiGet({ action: 'getGis', city: city })
+  ]);
+
+  currentRows = dataRes.rows || [];
+  currentGis = (gisRes && gisRes.available) ? gisRes.features : null;
+
+  applyScoring();
+  renderMap();
+  renderStats();
+  renderCards();
+  flyToCity(city);
+}
+
+/* --- point-in-polygon (ray casting) untuk cocokkan skor grid GIS --- */
+function pointInPolygon(lng, lat, polygonCoords){
+  // polygonCoords = array ring pertama: [[lng,lat], [lng,lat], ...]
+  let inside = false;
+  const ring = polygonCoords[0];
+  for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+    const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    const intersect = ((yi>lat) !== (yj>lat)) &&
+      (lng < (xj-xi)*(lat-yi)/(yj-yi) + xi);
+    if(intersect) inside = !inside;
+  }
+  return inside;
+}
+function applyScoring(){
+  currentRows.forEach(function(p){
+    const coord = parseCoord(p.koordinat);
+    p._lat = coord ? coord[0] : null;
+    p._lng = coord ? coord[1] : null;
+    p._skorAuto = null;
+    if(currentGis && coord){
+      for(const feat of currentGis){
+        if(feat.geometry && feat.geometry.type === 'Polygon' &&
+           pointInPolygon(coord[1], coord[0], feat.geometry.coordinates)){
+          p._skorAuto = feat.properties.total;
+          break;
+        }
+      }
+    }
+  });
+}
+function parseCoord(str){
+  if(!str) return null;
+  const parts = String(str).split(',').map(function(s){ return parseFloat(s.trim()); });
+  if(parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+  return parts; // [lat, lng]
+}
+
+/* --- render peta --- */
+function renderMap(){
+  markersLayer.clearLayers();
+  currentRows.forEach(function(p){
+    if(p._lat == null) return;
+    const skor = p._skorAuto != null ? p._skorAuto : p.skor;
+    const marker = L.circleMarker([p._lat, p._lng], {
+      radius:8, color:'#FF5757', fillColor:'#FF5757', fillOpacity:0.85, weight:1.5
+    });
+    marker.bindPopup(
+      '<b>' + (p.alamat||'Tanpa alamat') + '</b><br>' +
+      (skor != null ? 'Skor: ' + skor + '<br>' : '') +
+      formatRupiah(p.hargaSewa) + '/tahun'
+    );
+    marker.addTo(markersLayer);
+  });
+}
+function flyToCity(city){
+  const withCoord = currentRows.filter(function(p){ return p._lat != null; });
+  if(withCoord.length > 0){
+    const avgLat = withCoord.reduce(function(a,p){return a+p._lat;},0)/withCoord.length;
+    const avgLng = withCoord.reduce(function(a,p){return a+p._lng;},0)/withCoord.length;
+    map.flyTo([avgLat, avgLng], 12, { duration: 1.2 });
+  }
+}
+
+/* --- stats --- */
+function renderStats(){
+  const strip = document.getElementById('statStrip');
+  if(currentRows.length === 0){ strip.innerHTML = ''; return; }
+  const prices = currentRows.map(function(p){ return parseFloat(p.hargaSewa)||0; }).filter(function(v){return v>0;});
+  const scores = currentRows.map(function(p){ return p._skorAuto != null ? p._skorAuto : parseFloat(p.skor); }).filter(function(v){return !isNaN(v);});
+  const avgScore = scores.length ? (scores.reduce(function(a,b){return a+b;},0)/scores.length).toFixed(1) : '—';
+  strip.innerHTML =
+    stat(currentRows.length, 'Properti terdaftar') +
+    stat(prices.length ? formatRupiah(Math.min.apply(null,prices)) : '—', 'Harga termurah') +
+    stat(prices.length ? formatRupiah(Math.max.apply(null,prices)) : '—', 'Harga termahal') +
+    stat(avgScore, 'Rata-rata skor' + (currentGis ? '' : ' (data GIS belum ada)'));
+}
+function stat(num,label){
+  return '<div class="stat"><div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
+}
+
+/* --- cards --- */
+function renderCards(){
+  const grid = document.getElementById('cardGrid');
+  if(currentRows.length === 0){
+    grid.innerHTML = '<div class="empty-state">Belum ada properti untuk kota ini.</div>';
+    return;
+  }
+  const list = currentRows.slice().sort(function(a,b){
+    if(currentSort === 'harga') return (parseFloat(a.hargaSewa)||Infinity) - (parseFloat(b.hargaSewa)||Infinity);
+    const sa = a._skorAuto != null ? a._skorAuto : (parseFloat(a.skor)||-1);
+    const sb = b._skorAuto != null ? b._skorAuto : (parseFloat(b.skor)||-1);
+    return sb - sa;
+  });
+  grid.innerHTML = list.map(cardHTML).join('');
+}
+function cardHTML(p){
+  const skor = p._skorAuto != null ? p._skorAuto : p.skor;
+  const img = p.gambar || '';
+  const imgHtml = img
+    ? '<div class="card-img" style="background-image:url(\'' + img + '\')"></div>'
+    : '<div class="card-img noimg">Tidak ada gambar</div>';
+  return (
+    '<div class="card">' +
+      imgHtml +
+      (skor ? '<div class="score-pill">' + skor + '</div>' : '') +
+      '<div class="card-body">' +
+        '<div class="addr">' + (p.linkMaps ? '<a href="'+p.linkMaps+'" target="_blank">'+ (p.alamat||'Alamat belum diisi') +'</a>' : (p.alamat||'Alamat belum diisi')) + '</div>' +
+        (p.summary ? '<div class="summary">'+p.summary+'</div>' : '') +
+        '<div class="price-row"><span class="price">'+formatRupiah(p.hargaSewa)+' <small>/tahun</small></span></div>' +
+        '<div class="card-links">' +
+          (p.linkAgent ? '<a href="'+p.linkAgent+'" target="_blank">Profil Agent</a>' : '') +
+          (p.contactAgent ? '<a class="primary" href="'+p.contactAgent+'" target="_blank">Hubungi</a>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function formatRupiah(v){
+  const n = parseFloat(v);
+  if(isNaN(n) || n===0) return '—';
+  return 'Rp ' + n.toLocaleString('id-ID');
+}
+
+/* =====================================================================
+   MINI SUBMISSION BOX — upload data GIS baru (newdata_[kota].html)
+   ===================================================================== */
+async function handleGisUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+
+  if(!file.name.toLowerCase().endsWith('.html')){
+    showModal(false, 'Submisi ditolak', 'File yang diupload harus berformat .html');
+    e.target.value = '';
+    return;
+  }
+
+  // ekstrak nama kota dari pola nama file: newdata_[NamaKota].html
+  const match = file.name.match(/^newdata_(.+)\.html$/i);
+  if(!match){
+    showModal(false, 'Submisi ditolak', 'Nama file harus mengikuti format: newdata_[nama sheet].html');
+    e.target.value = '';
+    return;
+  }
+  const cityName = match[1];
+
+  // cek apakah sheet kota tersedia (realtime)
+  const listRes = await apiGet({ action: 'listSheets' });
+  const sheets = listRes.sheets || [];
+  if(sheets.indexOf(cityName) === -1){
+    showModal(false, 'Submisi gagal', 'Sheet dengan nama "' + cityName + '" tidak ditemukan di spreadsheet.');
+    e.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async function(ev){
+    const text = ev.target.result;
+    // ekstraksi grid data: file wajib memuat penanda /* GISDATA_START */ [...] /* GISDATA_END */
+    const startTag = '/* GISDATA_START */';
+    const endTag = '/* GISDATA_END */';
+    const startIdx = text.indexOf(startTag);
+    const endIdx = text.indexOf(endTag);
+    if(startIdx === -1 || endIdx === -1){
+      showModal(false, 'Submisi gagal', 'File tidak memuat penanda data GIS yang valid (GISDATA_START/END). Pastikan file dihasilkan dari template yang benar.');
+      e.target.value = '';
+      return;
+    }
+    let jsonText = text.substring(startIdx + startTag.length, endIdx).trim();
+
+    let gridData;
+    try{
+      gridData = JSON.parse(jsonText);
+    }catch(err){
+      showModal(false, 'Submisi gagal', 'Format data GIS di dalam file tidak valid: ' + err.message);
+      e.target.value = '';
+      return;
+    }
+
+    try{
+      const result = await apiPost({ action: 'uploadGis', city: cityName, gridData: gridData });
+      if(result.success){
+        showModal(true, 'Submisi berhasil', 'Data GIS untuk "' + cityName + '" berhasil ditambahkan.');
+        if(currentCity === cityName){
+          currentGis = gridData;
+          applyScoring();
+          renderMap();
+          renderStats();
+          renderCards();
+        }
+      } else {
+        showModal(false, 'Submisi gagal', result.error || 'Terjadi kesalahan tidak diketahui.');
+      }
+    }catch(err){
+      showModal(false, 'Submisi gagal', 'Tidak bisa menghubungi server: ' + err.message);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+</script>
+</body>
+</html>
