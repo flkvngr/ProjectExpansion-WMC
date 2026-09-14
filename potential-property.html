@@ -131,13 +131,46 @@
   .modal-box{
     background:var(--card); border:1px solid var(--line); border-radius:16px;
     padding:28px 30px; max-width:380px; text-align:center;
+    animation: modalPop .25s cubic-bezier(.25,.9,.35,1.2);
+    border-top:3px solid var(--salmon);
   }
+  @keyframes modalPop{
+    0%{ opacity:0; transform:scale(.92) translateY(6px); }
+    100%{ opacity:1; transform:scale(1) translateY(0); }
+  }
+  .modal-box.success{ border-top-color:#4ADE80; }
+  .modal-box.invalid{ border-top-color:#FBBF24; }
+  .modal-box.failed{ border-top-color:#FF5757; }
+  .modal-box.error{ border-top-color:#F87171; }
   .modal-box .icon{ font-size:34px; margin-bottom:10px; }
   .modal-box h3{ font-size:17px; margin-bottom:8px; }
-  .modal-box p{ font-size:13px; color:var(--slate); margin-bottom:18px; line-height:1.5; }
+  .modal-box p{ font-size:13px; color:var(--slate); margin-bottom:18px; line-height:1.5; white-space:pre-line; }
   .modal-box button{
     background:var(--salmon); color:#fff; border:none; border-radius:20px;
     padding:9px 24px; font-size:13px; cursor:pointer; font-weight:700;
+  }
+
+  /* animasi upload GIS */
+  .gis-upload{ position:relative; overflow:hidden; }
+  .gis-upload.uploading{ border-color:var(--salmon); }
+  .gis-upload .upload-status{
+    display:none; align-items:center; gap:10px; font-size:12.5px; color:var(--slate);
+    width:100%;
+  }
+  .gis-upload.uploading .upload-status{ display:flex; }
+  .gis-upload.uploading .txt, .gis-upload.uploading label{ display:none; }
+  .spinner{
+    width:18px; height:18px; border-radius:50%;
+    border:2.5px solid rgba(255,255,255,0.15); border-top-color:var(--salmon);
+    animation: spin .7s linear infinite; flex-shrink:0;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .upload-progress-track{
+    flex:1; height:5px; border-radius:3px; background:rgba(255,255,255,0.08); overflow:hidden;
+  }
+  .upload-progress-fill{
+    height:100%; width:0%; background:var(--salmon); border-radius:3px;
+    transition:width .3s ease;
   }
 
   @media (max-width:900px){
@@ -362,19 +395,24 @@
 
   <div class="grid" id="cardGrid"></div>
 
-  <div class="gis-upload">
+  <div class="gis-upload" id="gisUploadBox">
     <div class="txt">
       <h4>Update data analisis GIS</h4>
       <p>Upload file <code>newdata_[nama sheet].html</code> hasil convert analisis QGIS terbaru.</p>
     </div>
     <label for="gisFile">Upload File</label>
     <input type="file" id="gisFile" accept=".html">
+    <div class="upload-status">
+      <div class="spinner"></div>
+      <span id="uploadStatusText">Memproses file...</span>
+      <div class="upload-progress-track"><div class="upload-progress-fill" id="uploadProgressFill"></div></div>
+    </div>
   </div>
 </section>
 
 <!-- ======================= MODAL ======================= -->
 <div class="modal-bg" id="modalBg">
-  <div class="modal-box">
+  <div class="modal-box" id="modalBox">
     <div class="icon" id="modalIcon">✅</div>
     <h3 id="modalTitle">Berhasil</h3>
     <p id="modalText"></p>
@@ -386,7 +424,7 @@
 /* =====================================================================
    KONFIGURASI — ganti dengan URL Web App hasil deploy Apps Script kamu
    ===================================================================== */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxLKN1tqdoaRuL8o9dAXqAQfAs5-RJR88eAKjCaUwtbGT8Q4vDcJsqkX6lbZtlZxSE6Iw/exec';
+const APPS_SCRIPT_URL = 'PASTE_URL_WEB_APP_APPS_SCRIPT_DI_SINI';
 
 /* ===================== ROUTING SEDERHANA (#1 / #2) ===================== */
 function route(){
@@ -411,8 +449,23 @@ window.addEventListener('load', function(){
 });
 
 /* ===================== MODAL HELPER ===================== */
-function showModal(success, title, text){
-  document.getElementById('modalIcon').textContent = success ? '✅' : '⚠️';
+const MODAL_PRESET = {
+  success: { icon: '✅' },
+  invalid: { icon: '🚫' },  // tidak sesuai / validasi gagal
+  failed:  { icon: '❌' },  // proses jalan tapi ditolak server
+  error:   { icon: '⚠️' }   // gangguan jaringan / exception tak terduga
+};
+function showModal(type, title, text){
+  // dukung pemanggilan lama showModal(true/false, ...) supaya tidak putus
+  if(type === true) type = 'success';
+  if(type === false) type = 'failed';
+  const preset = MODAL_PRESET[type] || MODAL_PRESET.failed;
+
+  const box = document.getElementById('modalBox');
+  box.classList.remove('success','invalid','failed','error');
+  box.classList.add(type);
+
+  document.getElementById('modalIcon').textContent = preset.icon;
   document.getElementById('modalTitle').textContent = title;
   document.getElementById('modalText').textContent = text;
   document.getElementById('modalBg').classList.add('show');
@@ -540,7 +593,7 @@ document.getElementById('btnSubmit').addEventListener('click', async function(){
   };
   const missing = Object.keys(requiredMap).filter(function(k){ return !data[k] || String(data[k]).trim()===''; });
   if(missing.length > 0){
-    showModal(false, 'Belum lengkap', 'Field berikut wajib diisi: ' + missing.map(function(k){return requiredMap[k];}).join(', '));
+    showModal('invalid', 'Belum lengkap', 'Field berikut wajib diisi: ' + missing.map(function(k){return requiredMap[k];}).join(', '));
     return;
   }
 
@@ -548,17 +601,17 @@ document.getElementById('btnSubmit').addEventListener('click', async function(){
   try{
     const result = await apiPost({ action: 'submitProperty', data: data });
     if(result.success){
-      showModal(true, 'Berhasil disimpan', 'Data properti sudah masuk ke spreadsheet.');
+      showModal('success', 'Berhasil disimpan', 'Data properti sudah masuk ke spreadsheet.');
       document.querySelectorAll('#page1 input, #page1 textarea').forEach(function(el){ el.value=''; });
       photoBase64 = '';
       const preview = document.getElementById('photoPreview');
       if(preview) preview.remove();
       document.getElementById('photoBoxText').style.display = 'block';
     } else {
-      showModal(false, 'Gagal disimpan', result.error || 'Terjadi kesalahan tidak diketahui.');
+      showModal('failed', 'Gagal disimpan', result.error || 'Terjadi kesalahan tidak diketahui.');
     }
   }catch(err){
-    showModal(false, 'Gagal terkirim', 'Tidak bisa menghubungi server: ' + err.message);
+    showModal('error', 'Gagal terkirim', 'Tidak bisa menghubungi server: ' + err.message);
   }
   btn.disabled = false; msg.textContent = '';
 });
@@ -770,79 +823,127 @@ function formatRupiah(v){
 /* =====================================================================
    MINI SUBMISSION BOX — upload data GIS baru (newdata_[kota].html)
    ===================================================================== */
+function setUploadProgress(pct, text){
+  const fill = document.getElementById('uploadProgressFill');
+  const label = document.getElementById('uploadStatusText');
+  if(fill) fill.style.width = pct + '%';
+  if(label && text) label.textContent = text;
+}
+function setUploadingState(isUploading){
+  const box = document.getElementById('gisUploadBox');
+  box.classList.toggle('uploading', isUploading);
+  document.getElementById('gisFile').disabled = isUploading;
+  if(isUploading) setUploadProgress(8, 'Membaca file...');
+}
+
 async function handleGisUpload(e){
   const file = e.target.files[0];
   if(!file) return;
 
-  if(!file.name.toLowerCase().endsWith('.html')){
-    showModal(false, 'Submisi ditolak', 'File yang diupload harus berformat .html');
-    e.target.value = '';
-    return;
-  }
+  setUploadingState(true);
 
-  // ekstrak nama kota dari pola nama file: newdata_[NamaKota].html
-  const match = file.name.match(/^newdata_(.+)\.html$/i);
-  if(!match){
-    showModal(false, 'Submisi ditolak', 'Nama file harus mengikuti format: newdata_[nama sheet].html');
-    e.target.value = '';
-    return;
-  }
-  const cityName = match[1];
+  try{
+    // validasi 1: ekstensi file
+    if(!file.name.toLowerCase().endsWith('.html')){
+      showModal('invalid', 'Submisi ditolak', 'File yang diupload harus berformat .html.\nFile Anda: "' + file.name + '"');
+      return;
+    }
+    setUploadProgress(20, 'Memeriksa nama file...');
 
-  // cek apakah sheet kota tersedia (realtime)
-  const listRes = await apiGet({ action: 'listSheets' });
-  const sheets = listRes.sheets || [];
-  if(sheets.indexOf(cityName) === -1){
-    showModal(false, 'Submisi gagal', 'Sheet dengan nama "' + cityName + '" tidak ditemukan di spreadsheet.');
-    e.target.value = '';
-    return;
-  }
+    // validasi 2: pola nama file newdata_[NamaKota].html
+    const match = file.name.match(/^newdata_(.+)\.html$/i);
+    if(!match){
+      showModal('invalid', 'Submisi ditolak', 'Nama file harus mengikuti format:\nnewdata_[nama sheet].html');
+      return;
+    }
+    const cityName = match[1];
+    setUploadProgress(35, 'Mengecek konfigurasi server...');
 
-  const reader = new FileReader();
-  reader.onload = async function(ev){
-    const text = ev.target.result;
-    // ekstraksi grid data: file wajib memuat penanda /* GISDATA_START */ [...] /* GISDATA_END */
+    // validasi 3: pastikan APPS_SCRIPT_URL sudah di-set (bukan placeholder)
+    if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf('PASTE_URL') !== -1){
+      showModal('error', 'Server belum terhubung', 'APPS_SCRIPT_URL di file ini masih placeholder. Deploy Apps Script terlebih dahulu, lalu isi URL-nya di bagian atas script.');
+      return;
+    }
+
+    // validasi 4: cek apakah sheet kota tersedia (realtime ke spreadsheet)
+    setUploadProgress(50, 'Mengecek sheet "' + cityName + '"...');
+    let sheets;
+    try{
+      const listRes = await apiGet({ action: 'listSheets' });
+      if(listRes.error) throw new Error(listRes.error);
+      sheets = listRes.sheets || [];
+    }catch(err){
+      showModal('error', 'Tidak bisa menghubungi server', 'Gagal mengambil daftar kota dari spreadsheet: ' + err.message);
+      return;
+    }
+    if(sheets.indexOf(cityName) === -1){
+      showModal('invalid', 'Submisi tidak sesuai', 'Sheet dengan nama "' + cityName + '" tidak ditemukan di spreadsheet.\nPastikan nama kota di file persis sama dengan nama sheet.');
+      return;
+    }
+
+    // baca isi file
+    setUploadProgress(65, 'Membaca isi file...');
+    const text = await file.text();
+
+    // validasi 5: penanda GISDATA
     const startTag = '/* GISDATA_START */';
     const endTag = '/* GISDATA_END */';
     const startIdx = text.indexOf(startTag);
     const endIdx = text.indexOf(endTag);
     if(startIdx === -1 || endIdx === -1){
-      showModal(false, 'Submisi gagal', 'File tidak memuat penanda data GIS yang valid (GISDATA_START/END). Pastikan file dihasilkan dari template yang benar.');
-      e.target.value = '';
+      showModal('invalid', 'Submisi tidak sesuai', 'File tidak memuat penanda data GIS yang valid (GISDATA_START/END).\nPastikan file dihasilkan dari template yang benar (lihat PANDUAN-format-newdata-GIS.md).');
       return;
     }
-    let jsonText = text.substring(startIdx + startTag.length, endIdx).trim();
+    const jsonText = text.substring(startIdx + startTag.length, endIdx).trim();
 
+    // validasi 6: format JSON
     let gridData;
     try{
       gridData = JSON.parse(jsonText);
     }catch(err){
-      showModal(false, 'Submisi gagal', 'Format data GIS di dalam file tidak valid: ' + err.message);
-      e.target.value = '';
+      showModal('invalid', 'Submisi tidak sesuai', 'Format data GIS di dalam file tidak valid (bukan JSON yang benar):\n' + err.message);
+      return;
+    }
+    if(!Array.isArray(gridData) || gridData.length === 0){
+      showModal('invalid', 'Submisi tidak sesuai', 'Data GIS harus berupa array fitur poligon, dan tidak boleh kosong.');
       return;
     }
 
+    // kirim ke server
+    setUploadProgress(85, 'Mengupload ke server...');
+    let result;
     try{
-      const result = await apiPost({ action: 'uploadGis', city: cityName, gridData: gridData });
-      if(result.success){
-        showModal(true, 'Submisi berhasil', 'Data GIS untuk "' + cityName + '" berhasil ditambahkan.');
-        if(currentCity === cityName){
-          currentGis = gridData;
-          applyScoring();
-          renderMap();
-          renderStats();
-          renderCards();
-        }
-      } else {
-        showModal(false, 'Submisi gagal', result.error || 'Terjadi kesalahan tidak diketahui.');
-      }
+      result = await apiPost({ action: 'uploadGis', city: cityName, gridData: gridData });
     }catch(err){
-      showModal(false, 'Submisi gagal', 'Tidak bisa menghubungi server: ' + err.message);
+      showModal('error', 'Gagal terkirim', 'Tidak bisa menghubungi server: ' + err.message);
+      return;
     }
+
+    if(result.success){
+      setUploadProgress(100, 'Selesai!');
+      showModal('success', 'Submisi berhasil', 'Data GIS untuk "' + cityName + '" berhasil ditambahkan.');
+      if(currentCity === cityName){
+        currentGis = gridData;
+        applyScoring();
+        renderMap();
+        renderStats();
+        renderCards();
+      }
+    } else {
+      showModal('failed', 'Submisi gagal', result.error || 'Server menolak data ini karena alasan yang tidak diketahui.');
+    }
+
+  } catch(err){
+    // jaring pengaman terakhir — seharusnya tidak pernah sampai sini,
+    // tapi supaya tidak pernah "diam saja" kalau ada kejadian tak terduga
+    showModal('error', 'Terjadi kesalahan', 'Ada masalah tak terduga: ' + err.message);
+  } finally{
+    setUploadingState(false);
+    setUploadProgress(0, 'Memproses file...');
     e.target.value = '';
-  };
-  reader.readAsText(file);
+  }
 }
+
 </script>
 </body>
 </html>
