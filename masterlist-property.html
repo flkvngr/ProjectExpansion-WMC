@@ -490,6 +490,12 @@ function renderGisLegend(min, max, colorFor){
 
 function renderMap(){
   if(!markersLayer) return;
+  // grid digambar DULU, marker properti BELAKANGAN — supaya marker selalu
+  // di atas grid warna, baik secara visual maupun buat keperluan klik
+  // (kalau grid digambar belakangan, dia "menutup" marker meski keliatan
+  // transparan, sehingga marker jadi tidak bisa diklik).
+  renderGisGrid();
+
   markersLayer.clearLayers();
   currentRows.forEach(function(p){
     if(p._lat == null) return;
@@ -499,7 +505,8 @@ function renderMap(){
     marker.bindTooltip((p.alamat||'Tanpa alamat') + (skor!=null ? ' • Skor '+skor : ''));
     marker.addTo(markersLayer);
   });
-  renderGisGrid();
+  // pengaman tambahan: paksa layer marker selalu di render-order paling atas
+  if(markersLayer.bringToFront) markersLayer.bringToFront();
 }
 
 function flyToCity(){
