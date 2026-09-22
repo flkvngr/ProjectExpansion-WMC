@@ -60,6 +60,26 @@
 
   /* ============ SECTION 2 : PETA ============ */
   #map{ height:460px; border-radius:16px; border:1px solid var(--line); margin-bottom:10px; }
+
+  /* --- minicard hover di marker peta --- */
+  .leaflet-tooltip.minicard-tooltip{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:0; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,.45);
+    opacity:1;
+  }
+  .leaflet-tooltip.minicard-tooltip::before{ display:none; }
+  .map-minicard{ width:150px; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; }
+  .map-minicard .mc-img{ width:100%; height:88px; object-fit:cover; display:block; background:#1c2b52; }
+  .map-minicard .mc-noimg{
+    width:100%; height:88px; display:flex; align-items:center; justify-content:center;
+    font-size:10px; color:var(--slate); background:#1c2b52; text-align:center; padding:0 6px;
+  }
+  .map-minicard .mc-body{ padding:6px 8px 8px; }
+  .map-minicard .mc-addr{
+    font-size:10.5px; color:var(--white); white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; margin-bottom:2px;
+  }
+  .map-minicard .mc-price{ font-size:12px; font-weight:700; color:var(--salmon); }
   .gis-legend{
     display:flex; flex-wrap:wrap; align-items:center; gap:12px;
     font-size:11.5px; color:var(--slate); margin-bottom:12px; min-height:14px;
@@ -501,12 +521,36 @@ function renderMap(){
     if(p._lat == null) return;
     const skor = p._skorAuto != null ? p._skorAuto : p.skor;
     const marker = L.circleMarker([p._lat, p._lng], { radius:8, color:'#fff', weight:2, fillColor:'#0f172a', fillOpacity:0.9 });
-    marker.on('click', function(){ showPropertyDetail(p); });
-    marker.bindTooltip((p.alamat||'Tanpa alamat') + (skor!=null ? ' • Skor '+skor : ''));
+    marker.on('click', function(){
+      showPropertyDetail(p);
+      try{ document.getElementById('detailPanel').scrollIntoView({behavior:'smooth', block:'center'}); }catch(err){}
+    });
+    marker.bindTooltip(minicardHTML(p, skor), {
+      direction:'top', offset:[0,-8], className:'minicard-tooltip', sticky:false
+    });
     marker.addTo(markersLayer);
   });
   // pengaman tambahan: paksa layer marker selalu di render-order paling atas
   if(markersLayer.bringToFront) markersLayer.bringToFront();
+}
+
+/* minicard hover di marker peta — otomatis ikut data apapun yang sedang
+   aktif di currentRows (spreadsheet, hasil GIS, atau submission baru),
+   karena dipanggil ulang tiap kali renderMap() jalan. */
+function minicardHTML(p, skor){
+  const img = getPhotoForRow(p);
+  const imgHtml = img
+    ? '<img class="mc-img" src="' + img + '">'
+    : '<div class="mc-noimg">Tidak ada gambar</div>';
+  return (
+    '<div class="map-minicard">' +
+      imgHtml +
+      '<div class="mc-body">' +
+        '<div class="mc-addr">' + (p.alamat || 'Alamat belum diisi') + '</div>' +
+        '<div class="mc-price">' + formatRupiah(p.hargaSewa) + (skor!=null ? ' • Skor '+skor : '') + '</div>' +
+      '</div>' +
+    '</div>'
+  );
 }
 
 function flyToCity(){
